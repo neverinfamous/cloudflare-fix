@@ -151,7 +151,7 @@ export async function handleD1DeleteDatabase(databaseId: string) {
     throw new Error(`Failed to delete D1 database: ${error}`)
   }
 
-  return 'Success'
+  return { success: true }
 }
 
 export async function handleD1Query(databaseId: string, query: string, params?: string[]) {

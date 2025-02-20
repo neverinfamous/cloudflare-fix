@@ -36,7 +36,6 @@ interface CloudflareWorkerResponse {
   messages: any[]
 }
 
-// New Worker Tool definitions
 const WORKER_LIST_TOOL: Tool = {
   name: 'worker_list',
   description: 'List all Workers in your account',
@@ -45,6 +44,7 @@ const WORKER_LIST_TOOL: Tool = {
     properties: {},
   },
 }
+
 const WORKER_GET_TOOL: Tool = {
   name: 'worker_get',
   description: "Get a Worker's script content",
@@ -60,7 +60,6 @@ const WORKER_GET_TOOL: Tool = {
   },
 }
 
-// Update the WORKER_PUT_TOOL definition
 const WORKER_PUT_TOOL: Tool = {
   name: 'worker_put',
   description: 'Create or update a Worker script with optional bindings and compatibility settings',
@@ -189,7 +188,7 @@ const WORKER_PUT_TOOL: Tool = {
       },
       skip_workers_dev: {
         type: 'boolean',
-        description: `Do not deploy the Worker on your workers.dev subdomain. Should be set to true if the user already has a domain name, or doesn't want this worker to be publicly accessible..`,
+        description: 'Do not deploy the Worker on your workers.dev subdomain. Should be set to true if the user already has a domain name, or doesn\'t want this worker to be publicly accessible..',
       },
       no_observability: {
         type: 'boolean',
@@ -215,6 +214,7 @@ const WORKER_DELETE_TOOL: Tool = {
     required: ['name'],
   },
 }
+
 export const WORKER_TOOLS = [WORKER_LIST_TOOL, WORKER_GET_TOOL, WORKER_PUT_TOOL, WORKER_DELETE_TOOL]
 
 export async function handleWorkerList() {
@@ -233,7 +233,7 @@ export async function handleWorkerList() {
     throw new Error(`Failed to list workers: ${error}`)
   }
 
-  const data = (await response.json()) as CloudflareWorkerListResponse // Add type assertion here
+  const data = (await response.json()) as CloudflareWorkerListResponse
   log('Worker list success:', data)
   return data.result
 }
@@ -259,9 +259,7 @@ export async function handleWorkerGet(name: string) {
 }
 
 export interface Observability {
-  /** If observability is enabled for this Worker */
   enabled: boolean
-  /** The sampling rate */
   head_sampling_rate?: number
 }
 
@@ -280,10 +278,9 @@ interface DurableObjectBinding {
   type: 'durable_object_namespace'
   name: string
   class_name: string
-  script_name?: string // Optional, defaults to the current worker
+  script_name?: string
 }
 
-// Update WorkerBinding to include Durable Objects
 type WorkerMetadataBinding =
   | {
       type: 'kv_namespace'
@@ -318,36 +315,15 @@ type WorkerMetadataBinding =
   | DurableObjectBinding
 
 type WorkerMetadataPut = {
-  /** The name of the entry point module. Only exists when the worker is in the ES module format */
   main_module?: string
-  /** The name of the entry point module. Only exists when the worker is in the service-worker format */
-  // body_part?: string;
   compatibility_date?: string
   compatibility_flags?: string[]
-  // usage_model?: "bundled" | "unbound";
   migrations?: CfDurableObjectMigrations
-  // capnp_schema?: string;
   bindings: WorkerMetadataBinding[]
-  // keep_bindings?: (
-  // 	| WorkerMetadataBinding["type"]
-  // 	| "secret_text"
-  // 	| "secret_key"
-  // )[];
-  // logpush?: boolean;
-  // placement?: CfPlacement;
-  // tail_consumers?: CfTailConsumer[];
-  // limits?: CfUserLimits;
-
-  // assets?: {
-  // 	jwt: string;
-  // 	config?: AssetConfig;
-  // };
   observability?: Observability | undefined
-  // Allow unsafe.metadata to add arbitrary properties at runtime
   [key: string]: unknown
 }
 
-// Update the handleWorkerPut function
 export async function handleWorkerPut(
   name: string,
   script: string,
@@ -370,7 +346,6 @@ export async function handleWorkerPut(
     observability: observability ? { enabled: true } : undefined,
   }
 
-  // Create form data with metadata and script
   const formData = new FormData()
   formData.set('metadata', JSON.stringify(metadata))
   formData.set(
@@ -416,7 +391,7 @@ export async function handleWorkerPut(
     }
   }
 
-  return 'Success'
+  return { success: true }
 }
 
 export async function handleWorkerDelete(name: string) {
@@ -436,7 +411,7 @@ export async function handleWorkerDelete(name: string) {
     throw new Error(`Failed to delete worker: ${error}`)
   }
 
-  return 'Success'
+  return { success: true }
 }
 
 export const WORKERS_HANDLERS: ToolHandlers = {

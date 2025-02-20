@@ -198,7 +198,7 @@ export async function handleR2CreateBucket(name: string) {
     throw new Error(`Failed to create R2 bucket: ${error}`)
   }
 
-  return 'Success'
+  return { success: true }
 }
 
 export async function handleR2DeleteBucket(name: string) {
@@ -215,7 +215,7 @@ export async function handleR2DeleteBucket(name: string) {
     throw new Error(`Failed to delete R2 bucket: ${error}`)
   }
 
-  return 'Success'
+  return { success: true }
 }
 
 export async function handleR2ListObjects(bucket: string, prefix?: string, delimiter?: string, limit?: number) {
@@ -279,7 +279,7 @@ export async function handleR2PutObject(bucket: string, key: string, content: st
     throw new Error(`Failed to put R2 object: ${error}`)
   }
 
-  return 'Success'
+  return { success: true }
 }
 
 export async function handleR2DeleteObject(bucket: string, key: string) {
@@ -296,7 +296,7 @@ export async function handleR2DeleteObject(bucket: string, key: string) {
     throw new Error(`Failed to delete R2 object: ${error}`)
   }
 
-  return 'Success'
+  return { success: true }
 }
 
 export const R2_HANDLERS: ToolHandlers = {
@@ -321,62 +321,62 @@ export const R2_HANDLERS: ToolHandlers = {
   },
 
   r2_delete_bucket: async (request) => {
-    const { name } = request.params.arguments as { name: string }
-    await handleR2DeleteBucket(name)
-    return {
-      toolResult: {
-        content: [{ type: 'text', text: `Successfully deleted bucket: ${name}` }],
-      },
-    }
-  },
+      const { name } = request.params.arguments as { name: string }
+      await handleR2DeleteBucket(name)
+      return {
+        toolResult: {
+          content: [{ type: 'text', text: `Successfully deleted bucket: ${name}` }],
+        },
+      }
+    },
 
-  r2_list_objects: async (request) => {
-    const { bucket, prefix, delimiter, limit } = request.params.arguments as {
-      bucket: string
-      prefix?: string
-      delimiter?: string
-      limit?: number
-    }
-    const results = await handleR2ListObjects(bucket, prefix, delimiter, limit)
-    return {
-      toolResult: {
-        content: [{ type: 'text', text: JSON.stringify(results, null, 2) }],
-      },
-    }
-  },
+    r2_list_objects: async (request) => {
+      const { bucket, prefix, delimiter, limit } = request.params.arguments as {
+        bucket: string
+        prefix?: string
+        delimiter?: string
+        limit?: number
+      }
+      const results = await handleR2ListObjects(bucket, prefix, delimiter, limit)
+      return {
+        toolResult: {
+          content: [{ type: 'text', text: JSON.stringify(results, null, 2) }],
+        },
+      }
+    },
 
-  r2_get_object: async (request) => {
-    const { bucket, key } = request.params.arguments as { bucket: string; key: string }
-    const content = await handleR2GetObject(bucket, key)
-    return {
-      toolResult: {
-        content: [{ type: 'text', text: content }],
-      },
-    }
-  },
+    r2_get_object: async (request) => {
+      const { bucket, key } = request.params.arguments as { bucket: string; key: string }
+      const content = await handleR2GetObject(bucket, key)
+      return {
+        toolResult: {
+          content: [{ type: 'text', text: content }],
+        },
+      }
+    },
 
-  r2_put_object: async (request) => {
-    const { bucket, key, content, contentType } = request.params.arguments as {
-      bucket: string
-      key: string
-      content: string
-      contentType?: string
-    }
-    await handleR2PutObject(bucket, key, content, contentType)
-    return {
-      toolResult: {
-        content: [{ type: 'text', text: `Successfully stored object: ${key}` }],
-      },
-    }
-  },
+    r2_put_object: async (request) => {
+      const { bucket, key, content, contentType } = request.params.arguments as {
+        bucket: string
+        key: string
+        content: string
+        contentType?: string
+      }
+      await handleR2PutObject(bucket, key, content, contentType)
+      return {
+        toolResult: {
+          content: [{ type: 'text', text: `Successfully stored object: ${key}` }],
+        },
+      }
+    },
 
-  r2_delete_object: async (request) => {
-    const { bucket, key } = request.params.arguments as { bucket: string; key: string }
-    await handleR2DeleteObject(bucket, key)
-    return {
-      toolResult: {
-        content: [{ type: 'text', text: `Successfully deleted object: ${key}` }],
-      },
-    }
-  },
-}
+    r2_delete_object: async (request) => {
+      const { bucket, key } = request.params.arguments as { bucket: string; key: string }
+      await handleR2DeleteObject(bucket, key)
+      return {
+        toolResult: {
+          content: [{ type: 'text', text: `Successfully deleted object: ${key}` }],
+        },
+      }
+    },
+  }

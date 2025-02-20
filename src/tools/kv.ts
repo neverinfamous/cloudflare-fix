@@ -187,7 +187,7 @@ export async function handlePut(namespaceId: string, key: string, value: string,
     throw new Error(`Failed to put value: ${error}`)
   }
 
-  return 'Success'
+  return { success: true }
 }
 
 export async function handleDelete(namespaceId: string, key: string) {
@@ -207,7 +207,7 @@ export async function handleDelete(namespaceId: string, key: string) {
     throw new Error(`Failed to delete key: ${error}`)
   }
 
-  return 'Success'
+  return { success: true }
 }
 
 export async function handleList(namespaceId: string, prefix?: string, limit?: number) {
