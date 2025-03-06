@@ -1,246 +1,72 @@
-# Cloudflare MCP Server
+# Cloudflare MCP Server JSON Parsing Issue Investigation
 
-Model Context Protocol (MCP) is a [new, standardized protocol](https://modelcontextprotocol.io/introduction) for managing context between large language models (LLMs) and external systems. In this repository, we provide an installer as well as an MCP Server for [Cloudflare's API](https://api.cloudflare.com).
+This repository documents an investigation into intermittent JSON parsing errors in the Cloudflare MCP server, particularly during high-load operations, server shutdowns, and cross-server interactions.
 
-This lets you use Claude Desktop, or any MCP Client, to use natural language to accomplish things on your Cloudflare account, e.g.:
+## Issue Description
 
-* `Please deploy me a new Worker with an example durable object.`
-* `Can you tell me about the data in my D1 database named '...'?`
-* `Can you copy all the entries from my KV namespace '...' into my R2 bucket '...'?`
-
-## Demo
-
-<div align="center">
-  <a href="https://www.youtube.com/watch?v=vGajZpl_9yA">
-    <img src="https://img.youtube.com/vi/vGajZpl_9yA/maxresdefault.jpg" alt="Demonstrating the newly-released MCP server to explore Cloudflare properties, like Workers, KV, and D1." width="600"/>
-  </a>
-</div>
-
-## Setup
-
-1. Run `npx @cloudflare/mcp-server-cloudflare init`
-
-<div align="left">
-    <img src="https://github.com/user-attachments/assets/163bed75-ec0c-478a-94b2-179969a90923" alt="Example console output" width="300"/>
-</div>
-
-2. Restart Claude Desktop, you should see a small 🔨 icon that shows the following tools available for use:
-
-<div align="left">
-    <img src="https://github.com/user-attachments/assets/a24275b1-1c6f-4754-96ef-dd7b9f0f5903" alt="Example tool icon" height="160"/>
-    <img src="https://github.com/user-attachments/assets/4fb8badb-6800-4a3f-a530-a344b3584bec" alt="Example tool list" height="160"/>
-</div>
-
-## Features
-
-### KV Store Management
-- `get_kvs`: List all KV namespaces in your account
-- `kv_get`: Get a value from a KV namespace
-- `kv_put`: Store a value in a KV namespace
-- `kv_list`: List keys in a KV namespace
-- `kv_delete`: Delete a key from a KV namespace
-
-### R2 Storage Management
-- `r2_list_buckets`: List all R2 buckets in your account
-- `r2_create_bucket`: Create a new R2 bucket
-- `r2_delete_bucket`: Delete an R2 bucket
-- `r2_list_objects`: List objects in an R2 bucket
-- `r2_get_object`: Get an object from an R2 bucket
-- `r2_put_object`: Put an object into an R2 bucket
-- `r2_delete_object`: Delete an object from an R2 bucket
-
-### D1 Database Management
-- `d1_list_databases`: List all D1 databases in your account
-- `d1_create_database`: Create a new D1 database
-- `d1_delete_database`: Delete a D1 database
-- `d1_query`: Execute a SQL query against a D1 database
-
-### Workers Management
-- `worker_list`: List all Workers in your account
-- `worker_get`: Get a Worker's script content
-- `worker_put`: Create or update a Worker script
-- `worker_delete`: Delete a Worker script
-
-### Analytics
-- `analytics_get`: Retrieve analytics data for your domain
-  - Includes metrics like requests, bandwidth, threats, and page views
-  - Supports date range filtering
-
-## Developing
-
-In the current project folder, run:
+The Cloudflare MCP server frequently encounters JSON parsing errors with messages like:
 
 ```
-pnpm install
-pnpm build:watch
+Unexpected token 'S', "Successful"... is not valid JSON
 ```
 
-Then, in a second terminal:
+These errors occur most commonly during:
+- High CPU load conditions
+- Application startup
+- Saving settings in profile panels
+- Server shutdown sequences
+- Cross-server interactions
 
-```
-node dist/index.js init
-```
+## Root Cause Analysis
 
-This will link Claude Desktop against your locally-installed version for you to test.
+Our investigation identified several contributing factors:
 
-## Usage outside of Claude
+1. **Raw String Messages**: During certain operations, raw strings like "Successful" are sent directly to stderr without proper JSON-RPC formatting
+2. **Race Conditions**: Cleanup processes during shutdown have race conditions in connection state management
+3. **Inconsistent Error Reporting**: Error handling during cleanup uses inconsistent message formats
+4. **Missing Sync Points**: The lack of synchronization points during critical operations leads to interleaved messages
 
-To run the server locally, run `node dist/index run <account-id>`.
+## Attempted Solution
 
-If you're using an alternative MCP Client, or testing things locally, emit the `tools/list` command to get an up-to-date list of all available tools. Then you can call these directly using the `tools/call` command.
+We implemented a partial fix that:
 
-### Workers
+1. **Standardized Transport Messages**: Modified message handling to ensure all communications use consistent JSON-RPC 2.0 format
+2. **Added Sync Points**: Introduced synchronization points for critical operations
+3. **Fixed Race Conditions**: Added state flags and timeouts to prevent race conditions during shutdown
 
-```javascript
-// List workers
-worker_list()
+### Effectiveness
 
-// Get worker code
-worker_get({ name: "my-worker" })
+Our solution **partially reduced the frequency of errors** but did not completely resolve the issue. The errors still occur during high CPU load conditions, particularly when:
+- Starting the application
+- Saving settings panels
+- Running multiple operations in parallel
 
-// Update worker
-worker_put({
-  name: "my-worker",
-  script: "export default { async fetch(request, env, ctx) { ... }}",
-  bindings: [
-    {
-      type: "kv_namespace",
-      name: "MY_KV",
-      namespace_id: "abcd1234"
-    },
-    {
-      type: "r2_bucket",
-      name: "MY_BUCKET",
-      bucket_name: "my-files"
-    }
-  ],
-  compatibility_date: "2024-01-01",
-  compatibility_flags: ["nodejs_compat"]
-})
+## Current Status
 
-// Delete worker
-worker_delete({ name: "my-worker" })
-```
+This issue represents a minor inconvenience rather than a critical problem. The error typically requires restarting the desktop application but doesn't cause data loss or other serious issues.
 
-### KV Store
+## Recommendations for Cloudflare MCP Server Team
 
-```javascript
-// List KV namespaces
-get_kvs()
+Based on our investigation, we believe a more comprehensive solution would require:
 
-// Get value
-kv_get({
-    namespaceId: "your_namespace_id",
-    key: "myKey"
-})
+1. **Message Queue System**: Implementing a proper message queue system that maintains state during transitions
+2. **Enhanced State Management**: Adding more robust state tracking to prevent race conditions
+3. **Graceful Shutdown Improvements**: Refining the shutdown sequence to ensure all in-flight operations complete properly
+4. **Consistent Error Handling**: Standardizing error reporting across all components
 
-// Store value
-kv_put({
-    namespaceId: "your_namespace_id",
-    key: "myKey",
-    value: "myValue",
-    expirationTtl: 3600 // optional, in seconds
-})
+## Files in This Repository
 
-// List keys
-kv_list({
-    namespaceId: "your_namespace_id",
-    prefix: "app_", // optional
-    limit: 10 // optional
-})
+- `src/` - Contains our modified source files with fixes
+- Documentation of test cases and error conditions
 
-// Delete key
-kv_delete({
-    namespaceId: "your_namespace_id",
-    key: "myKey"
-})
-```
+## References
 
-### R2 Storage
-
-```javascript
-// List buckets
-r2_list_buckets()
-
-// Create bucket
-r2_create_bucket({ name: "my-bucket" })
-
-// Delete bucket
-r2_delete_bucket({ name: "my-bucket" })
-
-// List objects in bucket
-r2_list_objects({ 
-    bucket: "my-bucket",
-    prefix: "folder/", // optional
-    delimiter: "/", // optional
-    limit: 1000 // optional
-})
-
-// Get object
-r2_get_object({
-    bucket: "my-bucket",
-    key: "folder/file.txt"
-})
-
-// Put object
-r2_put_object({
-    bucket: "my-bucket",
-    key: "folder/file.txt",
-    content: "Hello, World!",
-    contentType: "text/plain" // optional
-})
-
-// Delete object
-r2_delete_object({
-    bucket: "my-bucket",
-    key: "folder/file.txt"
-})
-```
-
-### D1 Database
-
-```javascript
-// List databases
-d1_list_databases()
-
-// Create database
-d1_create_database({ name: "my-database" })
-
-// Delete database
-d1_delete_database({ databaseId: "your_database_id" })
-
-// Execute a single query
-d1_query({
-    databaseId: "your_database_id",
-    query: "SELECT * FROM users WHERE age > ?",
-    params: ["25"] // optional
-})
-
-// Create a table
-d1_query({
-    databaseId: "your_database_id",
-    query: `
-        CREATE TABLE users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT UNIQUE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    `
-})
-```
-
-### Analytics
-
-```javascript
-// Get today's analytics
-analytics_get({
-    zoneId: "your_zone_id",
-    since: "2024-11-26T00:00:00Z",
-    until: "2024-11-26T23:59:59Z"
-})
-```
+- Cloudflare MCP Server GitHub: https://github.com/cloudflare/mcp-server-cloudflare
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+We welcome further investigation and improvements to this partial solution. If you encounter similar issues or have ideas for more robust fixes, please create an issue or pull request.
+
+## License
+
+This project is available under the same license as the original Cloudflare MCP server.
